@@ -1,0 +1,1998 @@
+---
+title: "Figures"
+author: "Yaru Li"
+date: "2024-04-28"
+output:
+  html_document:
+    toc: yes
+    toc_depth: 4
+    theme: paper
+    toc_float:
+      collapsed: no
+      smooth_scroll: no
+    keep_md: yes
+    dev: pdf
+  pdf_document:
+    toc: yes
+    toc_depth: '4'
+---
+
+
+# library
+```{r,message=FALSE}
+library(Seurat)
+library(patchwork)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(reshape2)
+library(tidyverse)
+library(ggsci)
+library(monocle3)
+library(data.table)
+library(readxl)
+library(ggplot2)
+library(ggpubr)
+library(pheatmap)
+library(plyr)
+library(SCENIC)
+library(ggrepel)
+library(ComplexHeatmap)
+library(circlize)
+library(clusterProfiler)
+library(msigdbr)
+library(org.Mm.eg.db)
+library(infercnv)
+library(rstatix)
+library(ArchR)
+library(RColorBrewer)
+library(ggalluvial)
+library(org.Hs.eg.db)
+library(parallel)
+library(SCopeLoomR)
+library(AUCell)
+library(SCENIC)
+library(KernSmooth)
+library(plotly)
+library(BiocParallel)
+library(grid)
+
+```
+
+# Path
+```{r setup, include=FALSE,message=FALSE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+path <- "/media/liyaru/LYR/MM2023/Github"
+knitr::opts_knit$set(root.dir = path)
+```
+
+# color
+```{r}
+col_cell <- c("#D51F26","#F47D2B","#89288F")
+col_sample <- c("#89C75F","#C06CAB","#F37B7D")
+col_celltype_new <- c(
+ "#D51F26","#89C75F","#1E78B4","#EACEE3","#A1CDE1" ,"#eebb44", #'HSC','MPP','LMPP','MLP','GMP','MEP'
+ "#90D5E4","#208A42","#8A9FD1","#F47D2B","#89288F","grey")
+ 
+col_CD34 <- c("#F37B7D","#89C75F","#1E78B4","#EACEE3","#A1CDE1" ,"#eebb44")
+
+# col_cds <- c("#F7FCFD","#E0ECF4","#BFD3E6","#9EBCDA","#8C96C6","#8C6BB1","#88419D") 
+col_cds <- c("#E0ECF4","#BFD3E6","#9EBCDA","#8C96C6","#8C6BB1","#88419D","#4D004B")
+
+col_B=c("#208A42","#90D5E4","#8A9FD1","#F47D2B","#D51F26","#88419D")
+col_B2=c( "#90D5E4","#208A42","#8A9FD1","#F47D2B","grey")
+
+col_sample_s <- c("#E1F1D7","#C3E3AF","#A6D587","#89C75F","#FCDEDE","#F9BDBE","#F59C9D","#F37B7D")
+col_type <- c("#89C75F","#F37B7D")
+
+rdwhbu <- colorRampPalette(c("navy", "white", "brown3"))
+```
+
+
+# Figure1 
+## 10X scRNA
+### data
+```{r}
+MM <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/MM_new.rds")
+# CD34 <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/CD34_new.rds")
+BC <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds")
+
+print(MM)
+#print(CD34)
+print(BC)
+
+```
+
+### UMAP
+```{r, fig.width=15,fig.height=5}
+p1 <- DimPlot(MM, group.by =  "cell",cols = col_cell,pt.size = 0.6)
+p2 <- DimPlot(MM,group.by = "celltype_new",cols = col_celltype_new,pt.size = 0.6)
+p3 <- DimPlot(MM, group.by =  "sample",cols = col_sample,pt.size = 0.6)
+
+p1 + p2 + p3
+
+```
+
+#### HSC UMAP zoom in
+```{r, fig.width=5,fig.height=5}
+Idents(MM) <- MM$cell
+CD34 <- subset(MM,idents="CD34")
+DimPlot(CD34,group.by = "celltype_new",cols = col_celltype_new,pt.size = 1)+
+  xlim(0,5)+
+  ylim(-15,-6)
+
+```
+
+
+### QC
+#### feature count
+```{r, fig.width=12, fig.height=4}
+MM$cell <- factor(MM$cell,levels = c("CD34","CD19","CD138"))
+
+p <- VlnPlot(MM,features = c("nCount_RNA","nFeature_RNA","percent.mt"),
+        group.by = "cell",split.by ="sample" ,cols = col_sample,
+        pt.size = 0) + 
+  theme(legend.position = "right")
+p
+
+```
+
+
+
+#### Marker gene exp 
+```{r, fig.width=20, fig.height=15}
+HSPC_marker <- c("CD34","HLF","AVP","CRHBP", # HSC
+                 "FLT3","DNTT", # LP
+                 "MPO","ELANE", # GMP
+                 "PBX1","KLF1" ) # MEP
+                 
+BC_marker <- c(# "FLT3",
+              "CD19","CD79A",
+               "IL7R","MME", # CD10,
+              "CD27","MS4A1")
+
+Plasma_marker <- c("SDC1","CD38","IGKC",
+                   "TNFRSF17" # BCMA
+                   )
+
+combined_plot <- NULL
+
+for (g in c(HSPC_marker,BC_marker,Plasma_marker)){
+  if (g %in% HSPC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#D51F26")
+  }
+  if (g %in% BC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#F47D2B")
+  }
+  if (g %in% Plasma_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#89288F")
+  }
+  
+  p <- FeaturePlot(MM,features = g,slot = "data",ncol = 4,pt.size = 0.6,order = T,
+            cols = cols)
+  
+  if (is.null(combined_plot)){
+    combined_plot <- p[[1]]
+  }else{
+    combined_plot <- combined_plot + p[[1]]
+  }
+}
+print(combined_plot)
+
+# p1 <- FeaturePlot(MM,features = HSPC_marker,slot = "data",ncol = 4,pt.size = 0.6,
+#             cols = c(alpha("#A1CDE1",0.3),"#D51F26"),
+#             order = T)
+# 
+# p2 <- FeaturePlot(MM,features = BC_marker,slot = "data",ncol = 4,pt.size = 0.6,
+#             cols = c(alpha("#A1CDE1",0.3),"#F47D2B"),
+#             order = T)
+# 
+# p3 <- FeaturePlot(MM,features = Plasma_marker,slot = "data",ncol = 4,pt.size = 0.6,
+#             cols = c(alpha("#A1CDE1",0.3),"#89288F"),
+#             order = T)
+```
+
+##### HSPC exp zoom in
+```{r, fig.width=15, fig.height=10,warning=FALSE,echo=FALSE}
+HSPC_marker <- c("CD34","HLF","AVP","CRHBP", # HSC
+                 "FLT3","DNTT", # LP
+                 "MPO","ELANE", # GMP
+                 "PBX1","KLF1" ) # MEP
+
+
+p1 <- FeaturePlot(CD34,
+                  features = HSPC_marker,slot = "data",ncol = 4,pt.size = 1,
+                  cols = c(alpha("#A1CDE1",0.3),"#D51F26"),
+                  order = T)&
+  xlim(0,5)&
+  ylim(-15,-6)
+
+print(p1)
+
+```
+
+#### Dotplot (average exp)
+```{r, fig.width=8, fig.height=4}
+DotPlot(MM,,features = c(HSPC_marker,BC_marker,Plasma_marker),
+        group.by = "celltype_new",cols = c("white","#D51F26")) + RotatedAxis()
+
+```
+
+
+### Correlation
+```{r,warning=FALSE, fig.width=6, fig.height=5}
+t = AverageExpression(MM,group.by = c("sample","cell"),slot = "scale.data")
+tt = t[["integrated"]]
+ttt = cor(tt,method = "spearman")
+
+col_dist = dist(ttt)
+hclust1 <- hclust(col_dist)
+myorder = c("HD_CD34","MM1_CD34","MM2_CD34","HD_CD19","MM1_CD19","MM2_CD19",
+            "HD_CD138","MM1_CD138","MM2_CD138")
+
+dend = reorder(as.dendrogram(hclust1),wts=order(match(myorder,rownames(ttt))),agglo.FUN = max)
+col_cluster <- as.hclust(dend)
+
+group = colnames(ttt)
+names(group) = NULL
+group = as.data.frame(group)
+rownames(group) <- group$group
+group <- separate(group,col="group",into = c("Class","Cell"))
+
+
+cell_col <- col_cell
+names(cell_col) <- c("CD34","CD19",'CD138')
+
+class_col <- col_sample
+names(class_col) <- c( "HD","MM1",'MM2')
+ann_colors <- list(Cell=cell_col,Class=class_col)
+
+p <- pheatmap(ttt,annotation_row = group,
+              annotation_colors = ann_colors)
+p
+
+
+```
+
+
+### Raito
+#### All cells
+```{r, fig.width=8, fig.height=4}
+m <- MM@meta.data
+m$number=1
+
+p1 <- ggplot(m,aes(sample,number,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values =  col_celltype_new)+
+  RotatedAxis()
+
+m <- ddply(m,'sample',transform,percent = 1/sum(number)*100)
+p2 <- ggplot(m,aes(sample,percent,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values =  col_celltype_new)+
+  RotatedAxis()
+
+p1 + p2
+```
+
+#### CD34+ cells
+```{r, fig.width=8, fig.height=4}
+m <- MM@meta.data
+m <- m[m$cell =="CD34",]
+m$number=1
+
+p1 <- ggplot(m,aes(sample,number,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_CD34)+
+  RotatedAxis()
+
+m <- ddply(m,'sample',transform,percent = 1/sum(number)*100)
+p2 <- ggplot(m,aes(sample,percent,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_CD34)+
+  RotatedAxis()
+
+p1 + p2
+```
+#####  prop test
+```{r}
+t = table(m$sample,m$celltype_new)
+ratio = prop.table(t) %>% as.data.frame()
+
+# MM1 vs HD
+tt = matrix(t[1:2,1:6],nrow = 2)
+# tt = t(tt) # same result
+# fisher.test(tt,simulate.p.value=TRUE)
+print(chisq.test(tt))
+
+# MM2 vs HD
+tt = matrix(t[c(1,3),1:6],nrow = 2)
+print(chisq.test(tt))
+
+```
+
+#### CD34+ cells HD vs MM
+```{r, fig.width=7, fig.height=4}
+m <- MM@meta.data
+m <- m[m$cell =="CD34",]
+
+m$type = m$sample
+m[m$type != 'HD','type'] = 'MM'
+
+m$number=1
+
+p1 <- ggplot(m,aes(type,number,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_CD34)+
+  RotatedAxis()+
+  NoLegend()
+
+m <- ddply(m,'type',transform,percent = 1/sum(number)*100)
+p2 <- ggplot(m,aes(type,percent,fill=celltype_new))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_CD34)+
+  RotatedAxis()
+
+p1 + p2
+```
+
+#####  prop test
+```{r}
+t = table(m$type,m$celltype_new)
+print(t)
+print(table(m$type))
+
+# MM vs HD all
+tt = matrix(t[1:2,1:6],nrow = 2)
+print(chisq.test(tt))
+
+# HSC
+prop.test(c(629,310),c(699,1008)) # HSC HD, HSC MM, HD all, MM all
+
+# LMPP
+prop.test(c(9,55),c(699,1008)) 
+
+```
+
+
+
+#### B cells
+```{R, fig.width=8, fig.height=4}
+m <- BC@meta.data
+m$number=1
+
+p1 <- ggplot(m,aes(sample,number,fill=celltype_BMNC))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_B2)+
+  RotatedAxis()+
+  NoLegend()
+
+m <- ddply(m,'sample',transform,percent = 1/sum(number)*100)
+p2 <- ggplot(m,aes(sample,percent,fill=celltype_BMNC))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_B2)+
+  RotatedAxis()
+
+p1 + p2
+
+```
+
+#####  prop test
+```{r}
+t = table(m$sample,m$celltype_BMNC)
+
+# MM1 vs HD
+tt = matrix(t[1:2,],nrow = 2)
+print(chisq.test(tt))
+
+# MM2 vs HD
+tt = matrix(t[c(1,3),],nrow = 2)
+print(chisq.test(tt))
+
+```
+#### B cells HD vs MM
+```{R, fig.width=8, fig.height=4}
+m <- BC@meta.data
+m$number=1
+
+p1 <- ggplot(m,aes(type,number,fill=celltype_BMNC))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_B2)+
+  RotatedAxis()+
+  NoLegend()
+
+m <- ddply(m,'type',transform,percent = 1/sum(number)*100)
+p2 <- ggplot(m,aes(type,percent,fill=celltype_BMNC))+
+  geom_bar(stat="identity",position="stack")+
+  theme_classic(base_size = 16)+
+  scale_fill_manual(values = col_B2)+
+  RotatedAxis()
+
+p1 + p2
+
+```
+#####  prop test
+```{r}
+t = table(m$type,m$celltype_BMNC)
+print(t)
+
+table(m$type)
+
+# MM vs HD
+tt = matrix(t[1:2,],nrow = 2)
+print(chisq.test(tt))
+
+prop.test(c(367,2431),c(2783,4420)) 
+
+```
+
+#### cytotrace2
+```{r, fig.width=3, fig.height=4}
+# Cal cytotrace score
+# library(CytoTRACE2) 
+# cytotrace2_result <- cytotrace2(BC,
+#                                 species = "human",
+#                                 is_seurat =  T,
+#                                 ncores = 10)
+# 
+# BC = AddMetaData(BC,cytotrace2_result$CytoTRACE2_Score,col.name = "CytoTRACE2_Score")
+# BC = AddMetaData(BC,cytotrace2_result$CytoTRACE2_Relative,col.name = "CytoTRACE2_Relative")
+# saveRDS(BC,"/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds")
+
+# VlnPlot(BC,features = 'CytoTRACE2_Score',group.by = "celltype_BMNC",split.by = "type")
+# VlnPlot(BC,features = 'CytoTRACE2_Relative',group.by = "celltype_BMNC",split.by = "type")
+# VlnPlot(BC,features = 'CytoTRACE2_Relative',group.by = "celltype_BMNC")
+# FeaturePlot(BC,features = 'CytoTRACE2_Relative')
+
+t <- BC@meta.data
+
+p <- ggboxplot(t, x="celltype_BMNC",
+               y="CytoTRACE2_Relative",
+               fill = "celltype_BMNC",
+               #add = "jitter",
+               palette = col_B2,
+               outlier.shape=NA)+
+  RotatedAxis()
+p
+```
+
+```{r, fig.width=2, fig.height=4}
+p <- ggboxplot(t, x="type",
+               y="CytoTRACE2_Relative",
+               fill = 'type',
+               outlier.shape=NA,
+               palette =  col_type)+
+  stat_compare_means(method = "t.test")
+
+p
+
+```
+
+
+
+## SMART-seq2
+### Data
+```{r}
+# Seurat object
+MMsmart <- readRDS("/media/liyaru/LYR/MM2023/5_Result/1_RDS/MMsmart.rds")
+HD_cds <- readRDS("/media/liyaru/LYR/MM2023/5_Result/1_RDS/monocle_HD.rds")
+#MM_cds <- readRDS("/media/liyaru/LYR/MM2023/5_Result/1_RDS/monocle_MM.rds")
+HD <- readRDS("/media/liyaru/LYR/MM2023/5_Result/1_RDS/MMsmart_HD.rds")
+MM_project <- readRDS("/media/liyaru/LYR/MM2023/5_Result/1_RDS/MMsmart_MM_project.rds")
+
+print(MMsmart)
+print(HD_cds)
+# print(MM_cds)
+print(HD)
+print(MM_project)
+
+```
+
+### QC
+#### feature count
+```{r, fig.width=8, fig.height=4}
+p <- VlnPlot(MMsmart,features = c("nCount_RNA","nFeature_RNA"),
+        group.by = "replicate",
+        pt.size = 0,
+        col=col_sample_s) + 
+  theme(legend.position = "right")
+p
+
+```
+
+#### Marker gene exp 
+```{r, fig.width=20, fig.height=12}
+HSPC_marker <- c("CD34", # HSC
+                 "DNTT") # LP 
+                 
+BC_marker <- c(# "FLT3",
+              "CD19","CD79A",
+               "IL7R","MME", # CD10,
+              "CD27","MS4A1")
+
+Plasma_marker <- c("SDC1","CD38","IGKC",
+                   "TNFRSF17" # BCMA
+                   )
+
+combined_plot <- NULL
+
+for (g in c(HSPC_marker,BC_marker,Plasma_marker)){
+  if (g %in% HSPC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#D51F26")
+  }
+  if (g %in% BC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#F47D2B")
+  }
+  if (g %in% Plasma_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#89288F")
+  }
+  
+  p <- FeaturePlot(MMsmart,features = g,slot = "data",ncol = 4,pt.size = 1,order = T,
+            cols = cols)
+  
+  if (is.null(combined_plot)){
+    combined_plot <- p[[1]]
+  }else{
+    combined_plot <- combined_plot + p[[1]]
+  }
+}
+print(combined_plot)
+
+
+```
+
+```{r, fig.width=8, fig.height=4}
+DotPlot(MMsmart,features = c(HSPC_marker,BC_marker,Plasma_marker),
+        group.by = "Celltype", cols = c("white","#D51F26")) + RotatedAxis()
+```
+
+### Monocle3 trajectory
+```{r, fig.width=6, fig.height=4}
+p1 <- plot_cells(HD_cds ,color_cells_by ="Celltype",label_cell_groups = FALSE,
+           cell_size = 0.6,group_label_size = 10,label_branch_points = F,
+           label_leaves = F,label_roots = F,
+           label_principal_points = F)+ 
+  facet_wrap("~class", nrow = 1)+
+  scale_color_manual(values=col_cds)+
+  NoLegend()
+p1 
+
+# p2 <- plot_cells(MM_cds ,color_cells_by ="Celltype",label_cell_groups = FALSE,
+#            cell_size = 0.6,group_label_size = 10,label_branch_points = F,
+#            label_leaves = F,label_roots = F,
+#            label_principal_points = F)+ 
+#   facet_wrap("~class", nrow = 1)+
+#   scale_color_manual(values=col_cds)
+# 
+# p1+p2
+```
+
+```{r, fig.width=16, fig.height=6}
+p1 <- DimPlot(HD,reduction = "umap",group.by = "Celltype",cols = col_cds)
+p2 <- DimPlot(MM_project,reduction = "ref.umap",group.by = "Celltype",cols = col_cds)
+p1 + p2
+
+```
+
+```{r, fig.width=20, fig.height=8}
+p1 <- DimPlot(HD,reduction = "umap",group.by = "Celltype",cols = col_cds,
+        split.by = "Celltype")+NoLegend()
+
+p2 <- DimPlot(MM_project,reduction = "ref.umap",group.by = "Celltype",cols = col_cds,
+        split.by = "Celltype")+NoLegend()
+
+p1 / p2
+
+```
+
+```{r}
+DimPlot(MMsmart,group.by = "class",cols = c("#89C75F","#F37B7D"))
+```
+
+#### UMAP distribution
+```{r}
+# emb = MMsmart@reductions$umap@cell.embeddings %>% as.data.frame()
+# emb$orig.ident = rownames(emb)
+# meta = MMsmart@meta.data
+# m <- merge(emb,meta,by="orig.ident")
+# 
+# mm <- m[m$Celltype == 'Plasma',]
+# 
+# ggplot(mm, aes(x = UMAP_2, fill = class)) +
+#   geom_density(alpha = 0.3)
+
+```
+
+
+### Slingshot
+#### HD
+```{r, fig.width=6, fig.height=4}
+library(slingshot)
+HD.sce = as.SingleCellExperiment(HD)
+sce_slingshot1 <- slingshot(HD.sce,      
+                            reducedDim = 'UMAP',  
+                            clusterLabels = HD.sce$Celltype,  
+                            start.clus = 'Pro')
+
+plot(reducedDims(sce_slingshot1)$UMAP, 
+     col = col_cds[HD.sce$Celltype], 
+     cex = 0.4,
+     pch=16, asp = 1)
+lines(SlingshotDataSet(sce_slingshot1), lwd=2, col='black')
+
+```
+
+
+```{r}
+# brach
+pt1 = sce_slingshot1$slingPseudotime_1
+pt2 = sce_slingshot1$slingPseudotime_2
+
+pt1 = pt1 / length(pt1[!is.na(pt1)]) * 1000
+pt2 = pt2 / length(pt2[!is.na(pt2)]) * 1000
+
+colors <- colorRampPalette(brewer.pal(11,'Spectral')[-6])(100)
+plotcol <- colors[cut(pt1, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP,
+     col = plotcol,
+     pch=16, asp = 1)
+
+colors <- colorRampPalette(brewer.pal(11,'Spectral')[-6])(100)
+plotcol <- colors[cut(pt2, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP,
+     col = plotcol,
+     pch=16, asp = 1)
+
+pt = c()
+# pt = (pt1 + pt2)/2
+for (i in 1:length(pt1)){
+  if(is.na(pt1[i])){
+    pt_i = pt2[i]
+  }else if (is.na(pt2[i])){
+    pt_i = pt1[i]
+  }else{
+    pt_i = (pt1[i] + pt2[i])/2
+  }
+  pt = c(pt,pt_i)
+}
+names(pt) <- colnames(sce_slingshot1)
+names(pt1) <- colnames(sce_slingshot1)
+names(pt2) <- colnames(sce_slingshot1)
+
+HD <- AddMetaData(HD,pt,col.name = "psuedotime")
+HD <- AddMetaData(HD,pt1,col.name = "psuedotime1")
+HD <- AddMetaData(HD,pt2,col.name = "psuedotime2")
+
+# VlnPlot(HD,features = "psuedotime1",group.by = "Celltype")
+# VlnPlot(HD,features = "psuedotime2",group.by = "Celltype")
+# VlnPlot(HD,features = "psuedotime",group.by = "Celltype")
+
+t <- HD@meta.data
+p <- ggboxplot(t, x="Celltype",
+               y="psuedotime",
+               fill = "Celltype",
+               #add = "jitter",
+               palette = col_cds,
+               outlier.shape=NA)+
+  RotatedAxis()
+p
+
+medians <- aggregate(psuedotime ~ Celltype, t, median, na.rm = TRUE)
+
+```
+
+```{r}
+colors <- colorRampPalette(brewer.pal(11,'Spectral'))(100)
+plotcol <- colors[cut(pt, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP,
+     col = plotcol,
+     pch=16, asp = 1)
+lines(SlingshotDataSet(sce_slingshot1), lwd=2, col='black')
+```
+
+
+#### MM
+```{r, fig.width=6, fig.height=4}
+MM2 = subset(MMsmart,ident = 'MM')
+MM.sce = as.SingleCellExperiment(MM2)
+sce_slingshot1 <- slingshot(MM.sce,     
+                            reducedDim = 'UMAP', 
+                            clusterLabels = MM.sce$Celltype,  
+                            start.clus = 'Pro')    
+
+# SlingshotDataSet(sce_slingshot1)
+
+plot(reducedDims(sce_slingshot1)$UMAP, 
+     col = col_cds[MM.sce$Celltype], 
+     cex = 0.4,
+     pch=16, asp = 1)
+
+lines(SlingshotDataSet(sce_slingshot1), lwd=2, col='black')
+```
+
+```{r}
+# brach
+pt1 = sce_slingshot1$slingPseudotime_1
+pt2 = sce_slingshot1$slingPseudotime_2
+
+pt1 = pt1 / length(pt1[!is.na(pt1)]) * 1000
+pt2 = pt2 / length(pt2[!is.na(pt2)]) * 1000
+
+colors <- colorRampPalette(brewer.pal(11,'Spectral')[-6])(100)
+plotcol <- colors[cut(pt1, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP,
+     col = plotcol,
+     pch=16, asp = 1)
+
+colors <- colorRampPalette(brewer.pal(11,'Spectral')[-6])(100)
+plotcol <- colors[cut(pt2, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP,
+     col = plotcol,
+     pch=16, asp = 1)
+
+pt = c()
+# pt = (pt1 + pt2)/2
+for (i in 1:length(pt1)){
+  if(is.na(pt1[i])){
+    pt_i = pt2[i]
+  }else if (is.na(pt2[i])){
+    pt_i = pt1[i]
+  }else{
+    pt_i = (pt1[i] + pt2[i])/2
+  }
+  pt = c(pt,pt_i)
+}
+names(pt) <- colnames(sce_slingshot1)
+names(pt1) <- colnames(sce_slingshot1)
+names(pt2) <- colnames(sce_slingshot1)
+
+MM2 <- AddMetaData(MM2,pt,col.name = "psuedotime")
+MM2 <- AddMetaData(MM2,pt1,col.name = "psuedotime1")
+MM2 <- AddMetaData(MM2,pt2,col.name = "psuedotime2")
+
+# VlnPlot(HD,features = "psuedotime1",group.by = "Celltype")
+# VlnPlot(HD,features = "psuedotime2",group.by = "Celltype")
+# VlnPlot(HD,features = "psuedotime",group.by = "Celltype")
+
+t <- MM2@meta.data
+p <- ggboxplot(t, x="Celltype",
+               y="psuedotime",
+               fill = "Celltype",
+               #add = "jitter",
+               palette = col_cds,
+               outlier.shape=NA)+
+  RotatedAxis()
+p
+
+```
+
+```{r, fig.width=6, fig.height=4}
+colors <- colorRampPalette(brewer.pal(11,'Spectral'))(100)
+plotcol <- colors[cut(pt, breaks=100)]
+plot(reducedDims(sce_slingshot1)$UMAP, 
+     col = plotcol, 
+     pch=16, asp = 1)
+lines(SlingshotDataSet(sce_slingshot1), lwd=2, col='black')
+
+```
+
+### Correlation
+```{r, fig.width=6, fig.height=5,warning=FALSE}
+t = AverageExpression(MMsmart,group.by = c("class","Celltype"),slot = "scale.data")
+tt = t[["RNA"]]
+ttt = cor(tt,method = "spearman")
+
+group = colnames(ttt)
+names(group) = NULL
+group = as.data.frame(group)
+rownames(group) <- group$group
+group <- separate(group,col="group",into = c("Class","Cell"))
+
+cell_col <- col_cds
+names(cell_col) <- c( "Pro","Pre","Immature","NaiveB","Breg","Memory","Plasma")
+
+class_col <- c("#89C75F","#F37B7D") 
+names(class_col) <- c( "HD","MM")
+ann_colors <- list(Cell=cell_col,Class=class_col)
+
+p <- pheatmap(ttt,annotation_row = group,
+              annotation_colors = ann_colors)
+p
+
+# sample_correlation <- ttt %>% as.data.frame()
+# fwrite(sample_correlation,"/media/liyaru/LYR/MM2023/6_PDF/Figure/Figure1H_spearman_correlation.csv",row.names = T)
+```
+
+
+### cytotrace2
+```{r, fig.width=4, fig.height=5}
+# library(CytoTRACE2)
+# cytotrace2_result <- cytotrace2(MMsmart,
+#                                 species = "human",
+#                                 is_seurat =  T,
+#                                 ncores = 10)
+# 
+# MMsmart = AddMetaData(MMsmart,cytotrace2_result$CytoTRACE2_Score,col.name = "CytoTRACE2_Score")
+# MMsmart = AddMetaData(MMsmart,cytotrace2_result$CytoTRACE2_Relative,col.name = "CytoTRACE2_Relative")
+# 
+# saveRDS(MMsmart,"/media/liyaru/LYR/MM2023/5_Result/1_RDS/MMsmart.rds")
+# 
+# FeaturePlot(MMsmart,features = 'CytoTRACE2_Relative')
+
+t <- MMsmart@meta.data
+t <- t[t$Celltype !='Plasma',]
+
+
+p <- ggboxplot(t, x="Celltype",
+               y="CytoTRACE2_Relative",
+               fill = "Celltype",
+               palette = col_cds,
+               outlier.shape=NA)+
+  RotatedAxis()
+p
+
+```
+
+
+```{r, fig.width=3, fig.height=4}
+
+p <- ggboxplot(t, x="class",
+               y="CytoTRACE2_Relative",
+               fill = "class",
+               palette = col_type,
+               outlier.shape=NA)+
+  stat_compare_means(method = "t.test")
+p
+
+```
+
+
+# Figure2
+## data
+```{r}
+BC <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds")
+print(BC)
+```
+
+
+## CNV result (from inferCNV)
+### HSC
+```{r}
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/inferCNV.png")
+```
+
+```{r}
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HMM.png")
+```
+
+
+### BC
+```{r}
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/inferCNV.png")
+```
+
+
+```{r}
+# HMM
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/HMM.png")
+```
+
+### Plasma
+
+```{r}
+# HMM
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/inferCNV.png")
+```
+
+
+```{r}
+knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/HMM.png")
+```
+
+## CNV score
+
+### HSC
+#### Chr1
+```{r, fig.width=5, fig.height=4}
+df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_chr1_CNV_score.csv")
+
+p1 <- plot(df_chr1$start,df_chr1$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr1$start,df_chr1$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+#### Chr17
+```{r, fig.width=5, fig.height=4}
+df_chr17 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_chr17_CNV_score.csv")
+
+p1 <- plot(df_chr17$start,df_chr17$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr17$start,df_chr17$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+
+```
+
+
+### BC
+#### Chr1
+```{r, fig.width=5, fig.height=4}
+df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr1_CNV_score.csv")
+
+# p1 <- plot(df_chr1$start,df_chr1$HD,type="l",ylim = c(0.8,1.2),lwd=3) + 
+#   abline(h= 0.95,lty=2,col="navy")+
+#   abline(h= 1,lty=2,col="grey")+
+#   abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr1$start,df_chr1$MM1.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p3 <- plot(df_chr1$start,df_chr1$MM1.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p4 <- plot(df_chr1$start,df_chr1$MM2.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p5 <- plot(df_chr1$start,df_chr1$MM2.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+#### Chr17
+```{r, fig.width=5, fig.height=4}
+df_chr <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr17_CNV_score.csv")
+
+p2 <- plot(df_chr$start,df_chr$MM1.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p3 <- plot(df_chr$start,df_chr$MM1.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p4 <- plot(df_chr$start,df_chr$MM2.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p5 <- plot(df_chr$start,df_chr$MM2.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+### Plasma
+#### Chr1
+```{r, fig.width=5, fig.height=4}
+df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/P_chr1_CNV_score.csv")
+
+p1 <- plot(df_chr1$start,df_chr1$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr1$start,df_chr1$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+#### Chr17
+```{r, fig.width=5, fig.height=4}
+df_chr17 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/P_chr17_CNV_score.csv")
+
+p1 <- plot(df_chr17$start,df_chr17$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr17$start,df_chr17$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+## Exp
+
+### chr and gene position
+```{r}
+# from http://hgdownload.cse.ucsc.edu/goldenpath/hg38/database/
+pos = fread("/media/liyaru/LYR/MM2023/1_Public_data/cytoBand.txt")
+chr1q = pos[(pos$V1 == 'chr1') & grepl("^q",pos$V4)]
+chr1q_start = min(chr1q$V2) #123400000
+print(chr1q_start)
+
+chr17p <- pos[(pos$V1 == 'chr17') & grepl("^p",pos$V4)]
+chr17p_end = max(chr17p$V3)
+print(chr17p_end) # 25100000
+
+CD34 <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/CD34_new.rds")
+Idents(CD34) <- CD34$Celltype
+HSC <- subset(CD34,idents=c("HSC"))
+
+DefaultAssay(HSC) <- "RNA"
+all.genes <- rownames(HSC)
+HSC <- NormalizeData(HSC)
+HSC <- ScaleData(HSC,features = all.genes)
+
+DefaultAssay(BC) <- "RNA"
+all.genes <- rownames(BC)
+BC <- NormalizeData(BC)
+BC <- ScaleData(BC,features = all.genes)
+
+m = MM@meta.data
+m = m[m$cell =='CD138' & m$celltype_new =='Plasmablast',]
+plasma <- subset(MM,cells=rownames(m))
+DefaultAssay(plasma) <- "RNA"
+all.genes <- rownames(plasma)
+plasma <- NormalizeData(plasma)
+plasma <- ScaleData(plasma,features = all.genes)
+
+
+geneFile <- read.table("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_gene_order_file.xls") %>% as.data.frame()
+colnames(geneFile) <- c("gene","chr","start","end")
+
+gene_all = Reduce(intersect,list(rownames(HSC),rownames(BC),rownames(plasma),geneFile$gene))
+geneFile <- geneFile[geneFile$gene %in% gene_all,]
+
+#chr1q_gene = geneFile[geneFile$chr == 'chr1' & geneFile$start > 123400000,'gene']
+chr1q_gene = geneFile[geneFile$chr == 'chr1' & geneFile$start > 143200000 & geneFile$end < 155100000
+,'gene'] # 1q21
+chr17p_gene = geneFile[geneFile$chr == 'chr17' & geneFile$start < 25100000,'gene']
+
+```
+
+
+### HSC
+```{r}
+t <- AverageExpression(HSC,group.by = "sample",slot = "scale",assays = "RNA") 
+df<- t$RNA %>% as.data.frame()
+df$gene <- rownames(df)
+
+df_long <- melt(df,
+                id.vars="gene",
+                variable.name="sample",
+                value.name = "avg_gene")
+
+df_long$avg_gene <- as.numeric(df_long$avg_gene)
+
+```
+
+
+#### 1q
+```{r, fig.width=4, fig.height=4}
+df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
+print(unique(df_chr1q$gene) %>% length()) # 1q gene number
+
+p <- ggboxplot(df_chr1q,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.4,0.4))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,alternative='less',ref.group = 'HD')
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=T)
+
+p
+
+```
+
+#### 17p
+```{r, fig.width=4, fig.height=4}
+df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
+print(unique(df_chr17p$gene) %>% length()) # 17p gene number
+
+p <- ggboxplot(df_chr17p,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.4,0.4))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = 'HD')
+#stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,alternative='greater',ref.group = 'HD')
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=F)
+
+p
+
+```
+
+### BC
+```{r}
+t <- AverageExpression(BC,group.by = "sample",slot = "scale",assays = "RNA") 
+df <- t$RNA %>% as.data.frame()
+df$gene <- rownames(df)
+
+df_long <- melt(df,
+                id.vars="gene",
+                variable.name="sample",
+                value.name = "avg_gene")
+
+df_long$avg_gene <- as.numeric(df_long$avg_gene)
+
+```
+
+#### 1q
+```{r, fig.width=4, fig.height=4}
+df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
+print(unique(df_chr1q$gene) %>% length()) # 1q gene number
+
+p <- ggboxplot(df_chr1q,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.2,0.2))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,ref.group = "HD")
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=F)
+
+p
+
+```
+
+#### 17p
+```{r, fig.width=4, fig.height=4}
+df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
+print(unique(df_chr17p$gene) %>% length()) # 17p gene number
+
+p <- ggboxplot(df_chr17p,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.4,0.4))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = "HD")
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=F)
+
+p
+
+```
+
+### plasma
+```{r}
+t <- AverageExpression(plasma,group.by = "sample",slot = "scale",assays = "RNA") 
+df <- t$RNA %>% as.data.frame()
+df$gene <- rownames(df)
+
+df_long <- melt(df,
+                id.vars="gene",
+                variable.name="sample",
+                value.name = "avg_gene")
+
+df_long$avg_gene <- as.numeric(df_long$avg_gene)
+```
+
+#### 1q
+```{r, fig.width=4, fig.height=4}
+df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
+print(unique(df_chr1q$gene) %>% length()) # 1q gene number
+
+p <- ggboxplot(df_chr1q,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.4,0.3))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,ref.group = "HD")
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=F)
+
+p
+
+```
+
+
+#### 17p
+```{r, fig.width=4, fig.height=4}
+df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
+print(unique(df_chr17p$gene) %>% length()) # 17p gene number
+
+p <- ggboxplot(df_chr17p,
+          x="sample",y="avg_gene",
+          fill = 'sample',
+          outlier.shape=NA)+
+  coord_cartesian(ylim = c(-0.3,0.3))+
+  scale_fill_manual(values=col_sample)
+
+stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = "HD")
+stat <- add_significance(stat, 'p')
+stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
+
+p <- p + stat_pvalue_manual(stat.test, 
+                      label = 'p.adj',
+                      tip.length = 0.005,
+                      hide.ns=F)
+
+p
+
+```
+
+# Figure 3
+## data
+```{r}
+BC <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds")
+print(BC)
+```
+
+## Marker exp
+### Heatmap
+```{r, fig.width=9, fig.height=9}
+DefaultAssay(BC) <- "RNA"
+# BC <- ScaleData(BC)
+# markers <- FindAllMarkers(BC)
+# fwrite(markers,"/media/liyaru/LYR/MM2023/Github/Sup_tables/BC_markers.csv")
+
+markers <- fread("/media/liyaru/LYR/MM2023/Github/Sup_tables/BC_markers.csv")
+top_m <- markers %>% group_by(cluster) %>% top_n(n=5,wt=avg_log2FC)
+mmm = top_m$gene
+
+print(mmm)
+# CRIP1 replicate
+
+BC_downsample = subset(BC,downsample=200)
+BC_downsample@assays$RNA@scale.data = rbind(BC_downsample@assays$RNA@scale.data, "CRIP1.2" = BC_downsample@assays$RNA@scale.data["CRIP1", ])
+
+mmm[29] = "CRIP1.2"
+
+DoHeatmap(BC_downsample,features = mmm,group.by = "celltype",group.colors =  col_B,
+          draw.lines = T,lines.width=6)+
+  scale_fill_gradientn(colors = c("#4575B4","white","#D73027"))
+
+```
+
+### Vlnplot
+```{r, fig.width=20, fig.height=16}
+B_surface <- c("CD19","MS4A1", #"CD20",
+             "CD24","CD27","CD38")
+
+B_pro <- c("BCL2","ZEB2","PAX5","KLF10","RUNX1")
+
+pla_diff <- c("PRDM1","XBP1","SSR4","SEC61G","PPIB")
+              
+antigen <- c("TNFRSF13B","TNFRSF1B","ITGAX","FCRL5","CCR7")
+
+DefaultAssay(BC) <- "RNA"
+p <- VlnPlot(BC,features = c(B_surface,B_pro,pla_diff,antigen),
+        group.by = "celltype",ncol = 5,pt.size = 0,slot="data")&
+  scale_fill_manual(values = col_B)&
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())&
+  labs(x="",y="")
+
+p
+```
+
+### Featureplot
+```{r, fig.width=12, fig.height=10}
+col_gene <- colorRampPalette(c("navy", "white", "brown"))(100)[c(32:46,65:100)]
+# col_gene <- colorRampPalette(c("navy", "white", "brown"))(100)
+DefaultAssay(MM) <- "RNA"
+DefaultAssay(BC) <- "RNA"
+
+p1 <- FeaturePlot(MM,features = "CD24",slot = "data",cols = col_gene)
+
+p2 <- FeaturePlot(MM,features = "FCRL5",slot = "data",cols = col_gene)
+
+p3 <- FeaturePlot(BC,features = "CD24",slot = "data",cols = col_gene)
+
+p4 <- FeaturePlot(BC,features = "FCRL5",slot = "data",cols = col_gene)
+
+p1 + p2 | p3 + p4
+
+```
+
+## GO
+```{r, fig.width=8, fig.height=3}
+# calculate DEGs
+# DefaultAssay(BC) <- "RNA"
+# Idents(BC) <- BC$has_dupli_chr1
+# DEG = FindMarkers(BC,ident.1 = "FALSE",ident.2 = "TRUE")
+# fwrite(DEG,"/media/liyaru/LYR/MM2023/5_Result/CD19.CNV.DEG.csv",row.names = T)
+
+DEG <- fread("/media/liyaru/LYR/MM2023/5_Result/CD19.CNV.DEG.csv") %>% as.data.frame()
+# rownames(DEG) <- DEG$V1
+# 
+# # other BC vs 1q B cells, logFC < 0 means 1q upregulate
+up = DEG[DEG$p_val_adj<0.05 & DEG$avg_log2FC < -0.5,] 
+# 
+# up$gene <- rownames(up)
+# ego <- enrichGO(
+#   gene          = up$gene,
+#   keyType       = "SYMBOL",
+#   OrgDb         =  org.Hs.eg.db,
+#   ont           = "ALL",
+#   pAdjustMethod = "BH",
+#   pvalueCutoff  = 0.05,
+#   qvalueCutoff  = 0.05,
+#   #readable      = TRUE
+# )
+# GO  = ego@result
+# fwrite(GO,"/media/liyaru/LYR/MM2023/5_Result/BC_1q_up_GO.csv")
+
+GO <- fread("/media/liyaru/LYR/MM2023/5_Result/BC_1q_up_GO.csv") %>% as.data.frame()
+term <- fread("/media/liyaru/LYR/MM2023/5_Result/CD19_CNV_up_GO_selected.csv") %>% as.data.frame()
+
+GO <- GO[GO$Description %in% term$Description,]
+GO <- separate(GO,col="GeneRatio",into = c("DEG","Geneset"),remove = F)
+GO$GenePercent <- as.integer(GO$DEG) / as.integer(GO$Geneset) * 100
+GO <- GO[order(GO$GenePercent),]
+GO$Description <- factor(GO$Description,levels = GO$Description)
+
+ggplot(GO,aes(x = GenePercent,y = Description))+
+  geom_point(aes(
+    color=p.adjust,
+    size=Count))+
+  scale_size()+
+  scale_color_gradientn(colors = c(rdwhbu(100)[100:1]))+
+  theme_bw()
+
+```
+
+## UMAP
+```{r, fig.width=14, fig.height=12}
+p1 <- DimPlot(BC,group.by = "integrated_snn_res.0.3",pt.size = 0.6)
+p2 <- DimPlot(BC,group.by = "celltype_BMNC",cols=col_B2,pt.size = 0.6)
+p3 <- DimPlot(BC,group.by = "celltype",cols=col_B,pt.size = 0.6)
+p4 <- DimPlot(BC,group.by = "has_dupli_chr1" ,cols = c("grey","brown3"),pt.size = 0.6)
+
+p1 + p2 + p3 + p4
+
+```
+
+### Marker gene exp 
+```{r, fig.width=15, fig.height=12}
+HSPC_marker <- c("CD34", # HSC
+                 "DNTT") # LP 
+                 
+BC_marker <- c(# "FLT3",
+              "CD19","CD79A",
+               "IL7R","MME", # CD10,
+              "CD27","MS4A1")
+
+Plasma_marker <- c("SDC1","CD38" # BCMA
+                   )
+
+combined_plot <- NULL
+
+for (g in c(HSPC_marker,BC_marker,Plasma_marker)){
+  if (g %in% HSPC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#D51F26")
+  }
+  if (g %in% BC_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#F47D2B")
+  }
+  if (g %in% Plasma_marker){
+    cols = c(alpha("#A1CDE1",0.3),"#89288F")
+  }
+  
+  p <- FeaturePlot(BC,features = g,slot = "data",ncol = 4,pt.size = 1,order = T,
+            cols = cols)
+  
+  if (is.null(combined_plot)){
+    combined_plot <- p[[1]]
+  }else{
+    combined_plot <- combined_plot + p[[1]]
+  }
+}
+print(combined_plot)
+
+
+```
+
+### B cell in global UMAP
+```{r, fig.width=14, fig.height=6}
+
+# # Add B cell inormation in MM seurat project
+# Bcelltype  <- as.character(BC$celltype)
+# names(Bcelltype) <- rownames(BC@meta.data)
+# MM <- AddMetaData(MM,Bcelltype,col.name = "Bcelltype")
+# 
+# B_dupli_chr1  <- as.character(BC$has_dupli_chr1)
+# names(B_dupli_chr1) <- rownames(BC@meta.data)
+# MM <- AddMetaData(MM,B_dupli_chr1,col.name = "B_dupli_chr1")
+# 
+MM@meta.data$Bcelltype <- factor(MM$Bcelltype,levels = c("Pro B","Pre B","Naive B","Memory-Like 1","Memory-Like 2","Memory-Like 3"))
+
+p1 <- DimPlot(MM,group.by = "Bcelltype",cols=col_B,pt.size = 0.6)
+p2 <- DimPlot(MM,group.by = "B_dupli_chr1",cols=c("#BFD3E6","brown3"),pt.size = 0.6)
+
+p1 + p2
+```
+
+### UMAP distribution
+```{r, fig.width=4, fig.height=4}
+emb = BC@reductions$umap@cell.embeddings %>% as.data.frame()
+emb$cellname = rownames(emb)
+meta = BC@meta.data
+meta$cellname = rownames(meta)
+m <- merge(emb,meta,by="cellname")
+
+ggplot(m, aes(x = -UMAP_2, fill = has_dupli_chr1)) +
+  geom_density(alpha = 0.3)+
+  scale_fill_manual(values = c("#BFD3E6","brown3"))+ 
+  theme_classic()
+  
+
+```
+
+
+# Figure 4
+## data
+```{r}
+BCP <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BCP.rds")
+```
+
+```{r}
+# MM <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/MM_new.rds")
+# m = MM@meta.data
+# m$BC_Plasma <- NA
+# 
+# # m[!is.na(m$B_dupli_chr1) & m$B_dupli_chr1 == "TRUE",'BC_Plasma'] <- 'BC_1q'
+# # m[!is.na(m$B_dupli_chr1) & m$B_dupli_chr1 == "FALSE",'BC_Plasma'] <- 'BC_other'
+# # m[m$cell =='CD138' & m$celltype_new =='Plasmablast','BC_Plasma'] <- 'Plasma'
+# # MM@meta.data = m
+# 
+# m[!is.na(m$Bcelltype) & m$Bcelltype == "Memory-Like 2",'BC_Plasma'] <- "Memory-Like 2"
+# m[!is.na(m$Bcelltype) & m$Bcelltype != "Memory-Like 2",'BC_Plasma'] <- 'BC_other'
+# m[m$cell =='CD138' & m$celltype_new =='Plasmablast','BC_Plasma'] <- 'Plasma'
+# MM@meta.data = m
+# 
+# cells <- rownames(MM@meta.data[!is.na(MM@meta.data$BC_Plasma),])
+# table(MM@meta.data$BC_Plasma)
+# BCP <- subset(MM,cells=cells)
+```
+
+
+## Expression
+```{r, fig.width=18, fig.height=12}
+
+col_BCP <- c("#bde0db","#eebabb","#ae8ec2")
+
+gene = c("CD19","MS4A1","CD38","TNFRSF17",'GPRC5D')
+chr1q = c("TXNIP","MCL1","PBXIP1","JTB",'ANP32E')
+
+B_surface <- c("CD24","CD27")
+B_pro <- c("BCL2","ZEB2","PAX5","KLF10","RUNX1")
+pla_diff <- c("PRDM1","XBP1","SSR4","SEC61G","PPIB")
+antigen <- c("TNFRSF13B","TNFRSF1B","ITGAX","FCRL5","CCR7")
+
+p <- VlnPlot(BCP,group.by = 'BC_Plasma',assay = "RNA",slot = "data",ncol=6,
+             pt.size = 0,cols = col_BCP,
+             features = c(gene,chr1q,B_surface,B_pro,pla_diff,antigen))&
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())&
+  labs(x="",y="")
+
+p
+
+```
+
+
+
+
+## BCR
+```{r, fig.width=25, fig.height=7}
+draw_plasma_top10_clone <- function(patient){
+  path = "/media/liyaru/LYR/MM2023/5_Result/14_BCR/BCR_all/result/1.CloneStat/Total/"
+  
+  CD24 = fread(paste0(path,patient[1]))
+  FCRL5 = fread(paste0(path,patient[2]))
+  PC = fread(paste0(path,patient[3]))
+  
+  clone_count <- function(clone){
+    cc = aggregate(clone$cloneCount,by=list(clone$VDJCombination),sum)
+    colnames(cc) <- c("clone","count")
+    cc <- cc[order(-cc$count),]
+    return(cc)
+  }
+  
+  CD24_clone_count = clone_count(CD24)
+  FCRL5_clone_count  = clone_count(FCRL5 )
+  PC_clone_count = clone_count(PC)
+  
+  colnames(CD24_clone_count)[2] <- "CD24_clone_count"
+  colnames(FCRL5_clone_count)[2] <- "FCRL5_clone_count"
+  colnames(PC_clone_count)[2] <- "PC_clone_count"
+  
+  df <- merge(CD24_clone_count,FCRL5_clone_count,by='clone',all.x=T,all.y=T)
+  df <- merge(df,PC_clone_count,by='clone',all.x=T,all.y=T)
+  df[is.na(df)] = 0
+  
+  df$CD24_percent <- df$CD24 / sum(df$CD24)
+  df$FCRL5_percent <- df$FCRL5 / sum(df$FCRL5)
+  df$PC_percent <- df$PC / sum(df$PC)
+  
+  # plasma top10 clone
+  df <- df[order(-df$PC_clone_count),]
+  fwrite(df,paste0("/media/liyaru/LYR/MM2023/5_Result/14_BCR/",patient[4],"_all.csv"))
+  
+  df_filter <- df[1:10,]
+  fwrite(df_filter,paste0("/media/liyaru/LYR/MM2023/5_Result/14_BCR/",patient[4],"_plasma_top10.csv"))
+  
+  # df_filter$CD24_percent <- df_filter$CD24 / sum(df_filter$CD24)
+  # df_filter$FCRL5_percent <- df_filter$FCRL5 / sum(df_filter$FCRL5)
+  # df_filter$PC_percent <- df_filter$PC / sum(df_filter$PC)
+  
+  df_long <- reshape2::melt(df_filter[,c("clone","CD24_percent","FCRL5_percent","PC_percent")],
+                            id.vars="clone")
+  colnames(df_long) <- c("clone","sample","percent")
+  
+  p <- ggplot(df_long, 
+              aes(x = sample,y=percent,fill = clone,
+                            stratum =  clone, alluvium =  clone))+
+    geom_col(position = 'stack', width = 0.6)+
+    theme_classic(base_size = 16)+
+    geom_stratum(width = 0.5, color='white')+
+    geom_alluvium(alpha = 0.4,
+                  width = 0.5,
+                  curve_type = "linear")+
+    RotatedAxis()
+  return(p)
+}
+
+HFB <- c("HFB_CD24/HFB_CD24.clonetype.filter.txt",
+         "HFB_CD307/HFB_CD307.clonetype.filter.txt",
+         "HFB_P/HFB_P.clonetype.filter.txt",
+         "HFB")
+
+DCP <- c("DCP_CD24/DCP_CD24.clonetype.filter.txt",
+         "DCP_CD307/DCP_CD307.clonetype.filter.txt",
+         "DCP_P/DCP_P.clonetype.filter.txt",
+         "DCP")
+
+LKS <- c("LKS_CD24/LKS_CD24.clonetype.filter.txt",
+         "LKS_CD307/LKS_CD307.clonetype.filter.txt",
+         "LKS_P/LKS_P.clonetype.filter.txt",
+         "LKS")
+
+p1 <- draw_plasma_top10_clone(HFB)
+p2 <- draw_plasma_top10_clone(DCP)
+p3 <- draw_plasma_top10_clone(LKS)
+
+p1 + p2 + p3
+```
+
+# Figure6
+## scATAC
+### Data
+```{r, fig.width=25, fig.height=7,warning=FALSE,message=FALSE}
+setwd("/media/liyaru/LYR/MM2023/5_Result/17_scATAC")
+MM1BC <- loadArchRProject(path = "./MM1_BC") #scATAC
+BC <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds") #scRNA
+print(MM1BC)
+```
+
+
+### QC
+```{r, fig.width=6, fig.height=6,warning=FALSE}
+df <- getCellColData(MM1BC, select = c("log10(nFrags)", "TSSEnrichment"))
+p1 <- ggPoint(
+  x = df[,1],
+  y = df[,2],
+  colorDensity = TRUE,
+  continuousSet = "sambaNight",
+  xlabel = "Log10 Unique Fragments",
+  ylabel = "TSS Enrichment",
+  xlim = c(log10(500), quantile(df[,1], probs = 0.99)),
+  ylim = c(0, quantile(df[,2], probs = 0.99))
+) + geom_hline(yintercept = 4, lty = "dashed") + geom_vline(xintercept = 3, lty = "dashed")
+
+p1
+```
+```{r, fig.width=6, fig.height=6,warning=FALSE}
+setwd("/media/liyaru/LYR/MM2023/5_Result/17_scATAC")
+p2 <- plotGroups(
+  ArchRProj = MM1BC,
+  colorBy = "cellColData",
+  name = c("TSSEnrichment"),
+  plotAs = "violin",
+  alpha = 0.4,
+  addBoxPlot = TRUE
+)
+
+p3 <- plotGroups(
+  ArchRProj = MM1BC,
+  colorBy = "cellColData",
+  name = c("log10(nFrags)"),
+  plotAs = "violin",
+  alpha = 0.4,
+  addBoxPlot = TRUE
+)
+
+p2 + p3
+```
+
+
+```{r, fig.width=6, fig.height=8}
+setwd("/media/liyaru/LYR/MM2023/5_Result/17_scATAC")
+p4 <- plotFragmentSizes(ArchRProj = MM1BC)
+p5 <- plotTSSEnrichment(ArchRProj = MM1BC)
+p4 / p5
+```
+
+### UMAP
+```{r, fig.width=24, fig.height=8,message=FALSE}
+setwd("/media/liyaru/LYR/MM2023/5_Result/17_scATAC")
+# MM1BC@cellColData$RNA_celltype <- factor(MM1BC@cellColData$RNA_celltype,levels =  c("Pro B","Pre B","Naive B","Memory-Like 1","Memory-Like 2","Memory-Like 3"))
+
+p1 <- plotEmbedding(ArchRProj = MM1BC, 
+                    colorBy = "cellColData", name = "Clusters", 
+                    embedding = "UMAP",size = 2)
+
+p2 <- plotEmbedding(ArchRProj = MM1BC, 
+                    colorBy = "cellColData", name = "RNA_celltype", 
+                    embedding = "UMAP",size = 2)+
+  scale_color_manual(values=c("#F47D2B","#D51F26","#89288F","#8A9FD1","#90D5E4","#208A42"))
+
+p3 <- plotEmbedding(ArchRProj = MM1BC, 
+                    colorBy = "cellColData", name = "RNA_dupli_chr1", 
+                    embedding = "UMAP",size = 2)+
+  scale_color_manual(values=c("grey","brown3"))
+
+
+p1 + p2 + p3
+
+```
+
+### Track
+#### CD19
+```{r,echo=FALSE}
+groups <- c("Pro B","Pre B","Naive B","Memory-Like 1","Memory-Like 2","Memory-Like 3")
+
+p <- plotBrowserTrack(
+  ArchRProj = MM1BC, 
+  groupBy = "RNA_celltype", 
+  useGroups = groups,
+  pal = col_B,
+  geneSymbol = 'CD19', 
+  upstream = 30000,
+  downstream = 30000,
+  features = NULL
+)
+
+grid::grid.draw(p$CD19)
+```
+
+
+#### CD38
+```{r,echo=FALSE,message=FALSE}
+p <- plotBrowserTrack(
+  ArchRProj = MM1BC, 
+  groupBy = "RNA_celltype", 
+  useGroups = groups,
+  pal = col_B,
+  geneSymbol = 'CD38', 
+  upstream = 10000,
+  downstream = 30000,
+  features = NULL
+)
+grid::grid.draw(p$CD38)
+```
+
+#### FCRLF5
+```{r,echo=FALSE,message=FALSE}
+p <- plotBrowserTrack(
+  ArchRProj = MM1BC, 
+  groupBy = "RNA_celltype", 
+  useGroups = groups,
+  pal = col_B,
+  geneSymbol = 'FCRL5', 
+  upstream = 60000,
+  downstream = 20000,
+  features = NULL
+)
+grid::grid.draw(p$FCRL5)
+```
+
+```{r,echo=FALSE,message=FALSE}
+p <- plotBrowserTrack(
+  ArchRProj = MM1BC, 
+  groupBy = "RNA_dupli_chr1", 
+  pal = c("grey","brown3"),
+  geneSymbol = 'FCRL5', 
+  upstream = 60000,
+  downstream = 20000
+)
+grid::grid.draw(p$FCRL5)
+```
+
+### Differential Peaks
+```{r,warning=FALSE}
+# markerTest <- getMarkerFeatures(
+#   ArchRProj = MM1BC,
+#   useMatrix = "PeakMatrix",
+#   groupBy = "RNA_celltype",
+#   testMethod = "wilcoxon",
+#   bias = c("TSSEnrichment", "log10(nFrags)"),
+#   useGroups = "Memory-Like 2"
+# )
+# saveRDS(markerTest,"/media/liyaru/LYR/MM2023/5_Result/17_scATAC/markerTest.rds")
+
+markerTest <- readRDS("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/markerTest.rds")
+pma <- plotMarkers(seMarker = markerTest, 
+                  name = "Memory-Like 2", 
+                  cutOff ="FDR <= 0.05 & abs(Log2FC) >= 1", 
+                  plotAs = "MA")
+pma
+
+```
+
+### Enriched Motif
+```{r}
+# motifsUp <- peakAnnoEnrichment(
+#   seMarker = markerTest,
+#   ArchRProj = MM1BC,
+#   peakAnnotation = "Motif",
+#   cutOff = "FDR < 0.05 & Log2FC > 1"
+# )
+# motifsUp
+# saveRDS(motifsUp,"/media/liyaru/LYR/MM2023/5_Result/17_scATAC/motifsUp.rds")
+
+motifsUp <- readRDS("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/motifsUp.rds")
+df <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
+df <- df[order(df$mlog10Padj, decreasing = TRUE),]
+df$rank <- seq_len(nrow(df))
+df <- separate(df,col = "TF",into = c("TF","TFsup"))
+# fwrite(df,"/media/liyaru/LYR/MM2023/5_Result/17_scATAC/motifsUp_df.csv")
+
+ggUp <- ggplot(df, aes(rank, mlog10Padj, color = mlog10Padj)) + 
+  geom_point(size = 1) +
+  ggrepel::geom_label_repel(
+        data = df[1:40, ],
+        aes(label = TF), size = 3,show.legend = FALSE,
+        label.size=NA,fill = NA,color = "black",
+        max.overlaps=25) + 
+  ylab("-log10(P-adj) Motif Enrichment") + 
+  xlab("Rank Sorted TFs Enriched") +
+  theme_bw()+
+  scale_color_gradientn(colors = paletteContinuous(set = "comet"))+
+  geom_hline(yintercept = -log10(0.01),lty=3,col="black",lwd=0.5)
+
+ggUp
+```
+
+## Open regions
+```{r, fig.width=4, fig.height=6}
+Cell_open_regions <- fread("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/Open_regions.csv")
+p <- ggboxplot(Cell_open_regions,
+               x = "Celltype", y = "Open chromtin regions",
+               fill = "Celltype")+
+  RotatedAxis()+
+  scale_fill_manual(values=c("grey","brown3"))+
+  NoLegend()
+p + stat_compare_means(method = "t.test")
+```
+
+## Fimo result
+```{r, fig.width=5, fig.height=5}
+# motif of peaks around FCRL5 
+fimo <- fread("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/peak_FCRL5_fimo/fimo.tsv")
+knitr::kable(fimo[1:10],format = "pandoc")
+
+fimo <- separate(fimo,col=c("motif_alt_id"),into = c("id","sup1","motif","sup"),remove = F)
+
+fimo <- fimo[!duplicated(fimo$motif),]
+fimo$motif <- toupper(fimo$motif)
+fimo <- fimo[order(fimo$`q-value`),]
+fimo$rank <- 1:nrow(fimo)
+fimo$log10_q <- -log10(fimo$`q-value`)
+fimo$motif_seq <- paste0(fimo$motif,"(",fimo$matched_sequence,")")
+
+p <- ggplot(fimo, aes(rank, log10_q, color = log10_q)) + 
+  geom_point(size = 2) +
+  ggrepel::geom_label_repel(
+        data = fimo[1:10, ],
+        aes(label = motif_seq), size = 3,show.legend = FALSE,
+        label.size=NA,fill = NA,color = "black",
+        max.overlaps=20) + 
+  ylab("-log10(q-value)") + 
+  xlab("Rank") +
+  theme_bw()+
+  scale_color_gradientn(colors = paletteContinuous(set ="solarExtra"))+
+  geom_hline(yintercept = -log10(0.01),lty=3,col="black",lwd=0.5)
+p
+
+```
+
+## SCENIC
+```{r, fig.width=6, fig.height=8}
+# vsnDir <- "/media/liyaru/LYR/MM2023/5_Result/11_SCENIC"
+# scenicLoomPath <- file.path(vsnDir, "CD19.SCENIC.loom")
+# file.exists(scenicLoomPath)
+# 
+# # read data
+# loom <- open_loom(scenicLoomPath)
+# exprMat <- get_dgem(loom)
+# exprMat_log <- log2(exprMat+1) # Better if it is logged/normalized
+# regulons_incidMat <- get_regulons(loom, column.attr.name='Regulons')
+# regulons <- regulonsToGeneLists(regulons_incidMat)
+# regulonAUC <- get_regulons_AUC(loom,column.attr.name='RegulonsAUC')
+# regulonAucThresholds <- get_regulon_thresholds(loom)
+# close_loom(loom)
+# 
+# cellClusters <- as.data.frame(BC@meta.data$celltype)
+# rownames(cellClusters) <- rownames(BC@meta.data)
+# colnames(cellClusters) <- "celltype"
+# 
+# selectedResolution <- "celltype"
+# # Split the cells by cluster:
+# cellsPerCluster <- split(rownames(cellClusters), cellClusters[,selectedResolution])
+# 
+# regulonAUC <- regulonAUC[onlyNonDuplicatedExtended(rownames(regulonAUC)),]
+# 
+# auc <- getAUC(regulonAUC)
+# colnames(auc) <- gsub("HD2","HD",colnames(auc))
+# saveRDS(auc,"/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.auc.rds")
+# 
+# # Calculate average expression:
+# regulonActivity_byCellType <- sapply(cellsPerCluster,
+#                                      function(cells) rowMeans(auc[,cells]))
+# # Scale expression:
+# regulonActivity_byCellType_Scaled <- t(scale(t(regulonActivity_byCellType), center = T, scale=T))
+# 
+# topRegulators <- reshape2::melt(regulonActivity_byCellType_Scaled)
+# colnames(topRegulators) <- c("Regulon", "CellType", "RelativeActivity")
+# topRegulators$CellType <- factor(as.character(topRegulators$CellType))
+# fwrite(topRegulators,"/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.topRegulators.csv")
+# 
+# top_regu <- topRegulators %>%
+#   group_by(CellType) %>%
+#   top_n(n=10,wt=RelativeActivity)
+# top_regu <- top_regu[!duplicated(top_regu$Regulon),]
+# 
+# # order
+# top_regu$CellType <- factor(top_regu$CellType,
+#                             levels = c("Pro B","Pre B","Naive B","Memory-Like 1","Memory-Like 2","Memory-Like 3"))
+# top_regu <- top_regu[order(top_regu$CellType,-top_regu$RelativeActivity),]
+# 
+# top_regu_matrix <- regulonActivity_byCellType_Scaled[top_regu$Regulon,]
+# fwrite(as.data.frame(top_regu_matrix),"/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.regulonAUC.heatmap.csv",row.names = T)
+
+top_regu_matrix <- fread("/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.regulonAUC.heatmap.csv") %>% as.data.frame()
+rownames(top_regu_matrix) <- top_regu_matrix$V1
+top_regu_matrix <- top_regu_matrix[, -1]
+
+anotation_col <- data.frame(celltype = colnames(top_regu_matrix))
+colB_scenic <- col_B
+names(colB_scenic) <- colnames(top_regu_matrix)
+ann_colors <- list(celltype=colB_scenic)
+
+p <- pheatmap(top_regu_matrix,cluster_rows = F,cluster_cols = F,
+         border_color = NA,
+         gaps_row = c(10,20,30,40,50),
+         color = rdwhbu(100),
+         show_rownames = F,
+         annotation_col = anotation_col,
+         annotation_colors = ann_colors)
+
+p
+```
+
+
+```{r, fig.width=6, fig.height=6}
+auc <- readRDS("/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.auc.rds")
+
+SPI1auc = as.data.frame(auc['SPI1(+)',])
+BC <- AddMetaData(BC,metadata = SPI1auc,col.name = "SPI1_regulonAUC")
+
+FeaturePlot(BC,features ="SPI1_regulonAUC",pt.size = 0.8)&
+  scale_color_gradientn(colors = c(rdwhbu(100)))
+```
+
+## Venn (TF overlap)
+```{r,warning=FALSE,fig.width=6, fig.height=6}
+library(VennDiagram)
+
+# enriched motif
+motifsUp <- readRDS("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/motifsUp.rds")
+df <- data.frame(TF = rownames(motifsUp), mlog10Padj = assay(motifsUp)[,1])
+df <- df[order(df$mlog10Padj, decreasing = TRUE),]
+df$rank <- seq_len(nrow(df))
+df <- separate(df,col = "TF",into = c("TF","TFsup"))
+df <- df[df$mlog10Padj > (-log10(0.01)),]
+Mem2_enriched_motif <- unique(df$TF)
+
+# motif of peaks around FCRL5 
+fimo <- fread("/media/liyaru/LYR/MM2023/5_Result/17_scATAC/peak_FCRL5_fimo/fimo.tsv")
+fimo <- separate(fimo,col=c("motif_alt_id"),into = c("id","sup1","motif","sup"),remove = F)
+fimo <- fimo[fimo$`q-value` < 0.01,]
+FCRL5_motif <- unique(fimo$motif) %>% toupper()
+
+topRegulators <- fread("/media/liyaru/LYR/MM2023/5_Result/11_SCENIC/tables/1.topRegulators.csv") %>% as.data.frame()
+topRegulators <- topRegulators[topRegulators$CellType == "Memory-Like 2",]
+topRegulators <- topRegulators[order(-topRegulators$RelativeActivity),]
+topRegulators <- topRegulators[1:10,]
+topRegulators$TF <- gsub("[(+)]","",topRegulators$Regulon)
+SCENIC_mem2_TF <- topRegulators$TF
+
+TF <- c(list(Mem2_enriched_motif),list(FCRL5_motif),list(SCENIC_mem2_TF))
+#names(TF) <- c("Mem2 scATAC enriched motif","Motif in peaks of FCRL5","Top10 regulon activity")
+names(TF) <- c("Enrichment","Regulate FCRL5","High Activity")
+p = venn.diagram(
+  x = TF,
+  filename=NULL,
+  fill= c("#EACEE3","#89C75F","#A1CDE1"),
+  width = 1000,
+  height = 1000, 
+)
+
+grid.draw(p)
+
+enrich_FCRL5 <- intersect(Mem2_enriched_motif,FCRL5_motif)
+print("Mem2 scATAC enriched motif (Enrichment)  &  Motif in peaks of FCRL5 (Regulate FCRL5)")
+print(enrich_FCRL5)
+
+enrich_act <- intersect(Mem2_enriched_motif,SCENIC_mem2_TF)
+print("Mem2 scATAC enriched motif (Enrichment)  &  Top10 regulon activity (High Activity)")
+print(enrich_act)
+
+```
+
+
