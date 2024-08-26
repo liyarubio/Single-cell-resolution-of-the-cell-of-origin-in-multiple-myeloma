@@ -4,3 +4,8 @@
 ### [CNV analysis by inferCNV](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/3_CNV.R)
 ### [RNA velocity by Dynamo in HD](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/4_dynamo_HD.ipynb)
 ### [RNA velocity by Dynamo in MM (same parameters as HD)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/4_dynamo_MM.ipynb)
+### [10X scATAC-seq processing](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/5_scATAC.R)
+### [Regulatory activity analysis by SCENIC](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/6_run_SCENIC.sh)
+### [Motif scanning by fimo](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/7_run_fimo.sh)
+### [Reproducibility codes (Other downstream analysis and visualization)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/Visualization.Rmd)
+### [Reproducibility codes (Other downstream analysis and visualization)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/Visualization.Rmd)
