@@ -44,9 +44,9 @@ setwd("/home/liyaru/DATA/MM")
 paths=NULL
 mylist=list()
 
-files=c("HD2_CD19","MM1_CD19_s","MM2_CD19",
-        "HD2_CD34","MM1_CD34","MM1_CD34_s","MM2_CD34","MM2_CD34_s",
-        "HD2_CD138","MM1_CD138_s","MM2_CD138")
+files=c("HD_CD19","MM1_CD19_s","MM2_CD19",
+        "HD_CD34","MM1_CD34","MM1_CD34_s","MM2_CD34","MM2_CD34_s",
+        "HD_CD138","MM1_CD138_s","MM2_CD138")
 
 sample = c("HD","MM1","MM2",
            "HD","MM1","MM1","MM2","MM2",
