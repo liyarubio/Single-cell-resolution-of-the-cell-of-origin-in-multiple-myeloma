@@ -8,4 +8,4 @@
 ### [Regulatory activity analysis by SCENIC](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/6_run_SCENIC.sh)
 ### [Motif scanning by fimo](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/7_run_fimo.sh)
 ### [Reproducibility codes (Other downstream analysis and visualization)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/Visualization.Rmd)
-### [Reproducibility codes (Other downstream analysis and visualization)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/Visualization.Rmd)
+### [Reproducibility codes (html)](https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/Visualization.html)
