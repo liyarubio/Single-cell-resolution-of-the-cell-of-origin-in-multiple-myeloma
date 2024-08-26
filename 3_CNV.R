@@ -220,7 +220,6 @@ sub_geneFile <-  geneFile[geneFile$V1%in%gn,]
 df <- as.data.frame(expr) %>% t() %>% as.data.frame()
 df$cell <- rownames(df)
 df$sample <- substring(rownames(df),1,3)
-df[which(df$sample_cnv=="HD_"),'sample_cnv']="HD"
 
 # mean (group X gene)
 t=aggregate(df[1:length(df)-1],list(df$sample),mean)
@@ -249,23 +248,25 @@ df_chr17 <- df_chr17[order(df_chr17$start),]
 fwrite(df_chr17,file = "/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_chr17_CNV_score.csv")
 
 
-#### ------ BCs CNV score---------------
+#### ------ BCs CNV score, group by 1qAmp ---------------
 cnv <- BC@meta.data
-cnv <- cnv[,c('type',"has_dupli_chr1")]
+cnv <- cnv[,c('type',"has_dupli_chr1")] # split by have chr1
 cnv$cell <- rownames(cnv)
 
 infercnv_obj = readRDS("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/run.final.infercnv_obj")
 expr <- infercnv_obj@expr.data
 gn <- rownames(expr)
 
-# use when creat inferCNV obj
-#geneFile <- read.table('/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/gene_order_file.xls')
 sub_geneFile <-  geneFile[geneFile$V1%in%gn,]
 
 df <- as.data.frame(expr) %>% t() %>% as.data.frame()
-# rownames(df) <- gsub("HD2","HD",rownames(df))
 df$sample <- substring(rownames(df),1,3)
 df$cell <- rownames(df)
+
+df_HD_score = df[df$type =='HD',4:ncol(df)-1] %>% as.matrix()
+quantile(df_HD_score,seq(0,1,0.01))
+Rmisc::CI(df_HD_score,ci=0.99) #confidence interval of a vector of data
+
 
 df <- merge(cnv,df,by="cell")
 
@@ -306,19 +307,61 @@ df_chr17$start <- as.numeric(df_chr17$start)
 df_chr17 <- df_chr17[order(df_chr17$start),]
 fwrite(df_chr17,file = "/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr17_CNV_score.csv")
 
+#### ------ BCs CNV score, group by sample --------------
+cnv <- BC@meta.data
+cnv <- cnv[,c('type',"has_dupli_chr1")] # split by have chr1
+cnv$cell <- rownames(cnv)
+
+infercnv_obj = readRDS("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/run.final.infercnv_obj")
+expr <- infercnv_obj@expr.data
+gn <- rownames(expr)
+
+sub_geneFile <-  geneFile[geneFile$V1%in%gn,]
+
+df <- as.data.frame(expr) %>% t() %>% as.data.frame()
+df$sample <- substring(rownames(df),1,3)
+df$cell <- rownames(df)
+
+df <- merge(cnv,df,by="cell") 
+
+# get average
+t=aggregate(df[1:length(df)-1],list(df$sample),mean)
+
+gene_by_sample <- as.data.frame(t(t))
+colnames(gene_by_sample) <- gene_by_sample[1,]
+gene_by_sample <- gene_by_sample [c(-(1:4)),]
+
+gene_by_sample$gene <- rownames(gene_by_sample)
+
+colnames(sub_geneFile) <- c("gene","chr","start","end")
+df<- merge(gene_by_sample,sub_geneFile,by="gene")
+
+df$chr_n <- gsub("chr","",df$chr,)
+df$chr_n <- factor(df$chr_n,levels = paste0(1:22))
+table(df$chr_n)
+
+df_chr1 <- df[which(df$chr_n=="1"),]
+df_chr1$start <- as.numeric(df_chr1$start)
+df_chr1 <- df_chr1[order(df_chr1$start),]
+fwrite(df_chr1,file = "/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr1_CNV_score_sample.csv")
+
+
+df_chr17 <- df[which(df$chr_n=="17"),]
+df_chr17$start <- as.numeric(df_chr17$start)
+df_chr17 <- df_chr17[order(df_chr17$start),]
+fwrite(df_chr17,file = "/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr17_CNV_score_sample.csv")
+
+
 #### ------Plasma CNV score ---------------
 infercnv_obj = readRDS("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/run.final.infercnv_obj")
 expr <- infercnv_obj@expr.data
 gn <- rownames(expr)
 
-# use when creat inferCNV obj
-# geneFile <- read.table('/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/P_gene_order_file.xls')
 sub_geneFile <-  geneFile[geneFile$V1%in%gn,]
 
 df <- as.data.frame(expr) %>% t() %>% as.data.frame()
 df$cell <- rownames(df)
 df$sample <- substring(rownames(df),1,3)
-df[which(df$sample_cnv=="HD_"),'sample_cnv']="HD"
 
 # mean (group X gene)
 t=aggregate(df[1:length(df)-1],list(df$sample),mean)
@@ -345,6 +388,3 @@ df_chr17 <- df[which(df$chr_n=="17"),]
 df_chr17$start <- as.numeric(df_chr17$start)
 df_chr17 <- df_chr17[order(df_chr17$start),]
 fwrite(df_chr17,file = "/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/P_chr17_CNV_score.csv")
-
-
-
