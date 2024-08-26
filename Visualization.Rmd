@@ -1,7 +1,7 @@
 ---
 title: "Figures"
 author: "Yaru Li"
-date: "2024-04-28"
+date: "2024-08-15"
 output:
   html_document:
     toc: yes
@@ -11,7 +11,7 @@ output:
       collapsed: no
       smooth_scroll: no
     keep_md: yes
-    dev: pdf
+    dev: png
   pdf_document:
     toc: yes
     toc_depth: '4'
@@ -94,13 +94,10 @@ rdwhbu <- colorRampPalette(c("navy", "white", "brown3"))
 ### data
 ```{r}
 MM <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/MM_new.rds")
-# CD34 <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/CD34_new.rds")
 BC <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/BC_new.rds")
 
 print(MM)
-#print(CD34)
 print(BC)
-
 ```
 
 ### UMAP
@@ -261,6 +258,10 @@ p
 m <- MM@meta.data
 m$number=1
 
+table(m$cell,m$sample)
+
+table(m$sample,m$celltype_new)
+
 p1 <- ggplot(m,aes(sample,number,fill=celltype_new))+
   geom_bar(stat="identity",position="stack")+
   theme_classic(base_size = 16)+
@@ -298,10 +299,12 @@ p2 <- ggplot(m,aes(sample,percent,fill=celltype_new))+
 
 p1 + p2
 ```
+
 #####  prop test
 ```{r}
 t = table(m$sample,m$celltype_new)
 ratio = prop.table(t) %>% as.data.frame()
+print(ratio)
 
 # MM1 vs HD
 tt = matrix(t[1:2,1:6],nrow = 2)
@@ -345,7 +348,9 @@ p1 + p2
 #####  prop test
 ```{r}
 t = table(m$type,m$celltype_new)
-print(t)
+t
+prop.table(t[1,1:6])
+prop.table(t[2,1:6])
 print(table(m$type))
 
 # MM vs HD all
@@ -420,10 +425,13 @@ p2 <- ggplot(m,aes(type,percent,fill=celltype_BMNC))+
 p1 + p2
 
 ```
+
 #####  prop test
 ```{r}
 t = table(m$type,m$celltype_BMNC)
 print(t)
+prop.table(t[1,1:5])
+prop.table(t[2,1:5])
 
 table(m$type)
 
@@ -437,7 +445,7 @@ prop.test(c(367,2431),c(2783,4420))
 
 #### cytotrace2
 ```{r, fig.width=3, fig.height=4}
-# Cal cytotrace score
+## Cal cytotrace score
 # library(CytoTRACE2) 
 # cytotrace2_result <- cytotrace2(BC,
 #                                 species = "human",
@@ -474,7 +482,6 @@ p <- ggboxplot(t, x="type",
   stat_compare_means(method = "t.test")
 
 p
-
 ```
 
 
@@ -500,6 +507,8 @@ print(MM_project)
 ### QC
 #### feature count
 ```{r, fig.width=8, fig.height=4}
+table(MMsmart$Celltype,MMsmart$replicate)
+
 p <- VlnPlot(MMsmart,features = c("nCount_RNA","nFeature_RNA"),
         group.by = "replicate",
         pt.size = 0,
@@ -622,6 +631,9 @@ sce_slingshot1 <- slingshot(HD.sce,
                             reducedDim = 'UMAP',  
                             clusterLabels = HD.sce$Celltype,  
                             start.clus = 'Pro')
+saveRDS(sce_slingshot1,'/media/liyaru/LYR/MM2023/5_Result/7_Seurat/Smartseq_slingshot_HD.rds')
+
+sce_slingshot1 <- readRDS('/media/liyaru/LYR/MM2023/5_Result/7_Seurat/Smartseq_slingshot_HD.rds')
 
 plot(reducedDims(sce_slingshot1)$UMAP, 
      col = col_cds[HD.sce$Celltype], 
@@ -710,6 +722,9 @@ sce_slingshot1 <- slingshot(MM.sce,
                             start.clus = 'Pro')    
 
 # SlingshotDataSet(sce_slingshot1)
+saveRDS(sce_slingshot1,'/media/liyaru/LYR/MM2023/5_Result/7_Seurat/Smartseq_slingshot_MM.rds')
+
+sce_slingshot1 <- readRDS('/media/liyaru/LYR/MM2023/5_Result/7_Seurat/Smartseq_slingshot_MM.rds')
 
 plot(reducedDims(sce_slingshot1)$UMAP, 
      col = col_cds[MM.sce$Celltype], 
@@ -905,11 +920,22 @@ knitr::include_graphics("/media/liyaru/LYR/MM2023/5_Result/inferCNV/P/HMM.png")
 ```{r, fig.width=5, fig.height=4}
 df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_chr1_CNV_score.csv")
 
-p1 <- plot(df_chr1$start,df_chr1$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
-  abline(h= 0.95,lty=2,col="navy")+
-  abline(h= 1,lty=2,col="grey")+
-  abline(h= 1.05,lty=2,col="brown3")
+# Rmisc::CI(df_chr1$MM1,ci=0.05)
+# Rmisc::CI(df_chr1$MM2,ci=0.05)
 
+q = quantile(df_chr1$MM1,c(0.05,0.5,0.95))
+print(q)
+
+# t.test(df_chr1$HD2,df_chr1$MM1,paired = T)
+# wilcox.test(df_chr1$HD2,df_chr1$MM1,paired = T)
+
+p1 <- plot(df_chr1$start,df_chr1$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h=0.95,lty=2,col="navy")+
+  abline(h=1,lty=2,col="grey")+
+  abline(h=1.05,lty=2,col="brown3")
+
+q = quantile(df_chr1$MM2,c(0.05,0.5,0.95))
+print(q)
 p2 <- plot(df_chr1$start,df_chr1$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
@@ -921,11 +947,15 @@ p2 <- plot(df_chr1$start,df_chr1$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+
 ```{r, fig.width=5, fig.height=4}
 df_chr17 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_chr17_CNV_score.csv")
 
+q = quantile(df_chr17$MM1,c(0.05,0.5,0.95))
+print(q)
 p1 <- plot(df_chr17$start,df_chr17$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
   abline(h= 1.05,lty=2,col="brown3")
 
+q = quantile(df_chr17$MM2,c(0.05,0.5,0.95))
+print(q)
 p2 <- plot(df_chr17$start,df_chr17$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
@@ -935,7 +965,7 @@ p2 <- plot(df_chr17$start,df_chr17$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+
 ```
 
 
-### BC
+### BC group by 1q
 #### Chr1
 ```{r, fig.width=5, fig.height=4}
 df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr1_CNV_score.csv")
@@ -945,21 +975,31 @@ df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr1_CNV_scor
 #   abline(h= 1,lty=2,col="grey")+
 #   abline(h= 1.05,lty=2,col="brown3")
 
+q = quantile(df_chr1$MM1.Chr1_dupli,c(0.05,0.5,0.95))
+print(q)
+
 p2 <- plot(df_chr1$start,df_chr1$MM1.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
   abline(h= 1.05,lty=2,col="brown3")
 
+q = quantile(df_chr1$MM1.Other,c(0.05,0.5,0.95))
+print(q)
 p3 <- plot(df_chr1$start,df_chr1$MM1.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
   abline(h= 1.05,lty=2,col="brown3")
 
+
+q = quantile(df_chr1$MM2.Chr1_dupli,c(0.05,0.5,0.95))
+print(q)
 p4 <- plot(df_chr1$start,df_chr1$MM2.Chr1_dupli,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
   abline(h= 1.05,lty=2,col="brown3")
 
+q = quantile(df_chr1$MM2.Other,c(0.05,0.5,0.95))
+print(q)
 p5 <- plot(df_chr1$start,df_chr1$MM2.Other,type="l",ylim = c(0.8,1.2),lwd=3)+ 
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
@@ -990,6 +1030,48 @@ p5 <- plot(df_chr$start,df_chr$MM2.Other,type="l",ylim = c(0.8,1.2),lwd=3)+
   abline(h= 0.95,lty=2,col="navy")+
   abline(h= 1,lty=2,col="grey")+
   abline(h= 1.05,lty=2,col="brown3")
+
+```
+
+
+### BC group by sample
+#### Chr1
+```{r, fig.width=5, fig.height=4}
+df_chr1 <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr1_CNV_score_sample.csv")
+
+q = quantile(df_chr1$MM1,c(0.05,0.5,0.95))
+print(q)
+p1 <- plot(df_chr1$start,df_chr1$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+
+q = quantile(df_chr1$MM2,c(0.05,0.5,0.95))
+print(q)
+p2 <- plot(df_chr1$start,df_chr1$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+
+```
+
+
+#### Chr17
+```{r, fig.width=5, fig.height=4}
+df_chr <- fread("/media/liyaru/LYR/MM2023/5_Result/inferCNV/BC/BC_chr17_CNV_score_sample.csv")
+
+p1 <- plot(df_chr$start,df_chr$MM1,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
+p2 <- plot(df_chr$start,df_chr$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+ 
+  abline(h= 0.95,lty=2,col="navy")+
+  abline(h= 1,lty=2,col="grey")+
+  abline(h= 1.05,lty=2,col="brown3")
+
 
 ```
 
@@ -1026,253 +1108,6 @@ p2 <- plot(df_chr17$start,df_chr17$MM2,type="l",ylim = c(0.8,1.2),lwd=3)+
 
 ```
 
-## Exp
-
-### chr and gene position
-```{r}
-# from http://hgdownload.cse.ucsc.edu/goldenpath/hg38/database/
-pos = fread("/media/liyaru/LYR/MM2023/1_Public_data/cytoBand.txt")
-chr1q = pos[(pos$V1 == 'chr1') & grepl("^q",pos$V4)]
-chr1q_start = min(chr1q$V2) #123400000
-print(chr1q_start)
-
-chr17p <- pos[(pos$V1 == 'chr17') & grepl("^p",pos$V4)]
-chr17p_end = max(chr17p$V3)
-print(chr17p_end) # 25100000
-
-CD34 <- readRDS("/media/liyaru/LYR/MM2023/5_Result/7_Seurat/CD34_new.rds")
-Idents(CD34) <- CD34$Celltype
-HSC <- subset(CD34,idents=c("HSC"))
-
-DefaultAssay(HSC) <- "RNA"
-all.genes <- rownames(HSC)
-HSC <- NormalizeData(HSC)
-HSC <- ScaleData(HSC,features = all.genes)
-
-DefaultAssay(BC) <- "RNA"
-all.genes <- rownames(BC)
-BC <- NormalizeData(BC)
-BC <- ScaleData(BC,features = all.genes)
-
-m = MM@meta.data
-m = m[m$cell =='CD138' & m$celltype_new =='Plasmablast',]
-plasma <- subset(MM,cells=rownames(m))
-DefaultAssay(plasma) <- "RNA"
-all.genes <- rownames(plasma)
-plasma <- NormalizeData(plasma)
-plasma <- ScaleData(plasma,features = all.genes)
-
-
-geneFile <- read.table("/media/liyaru/LYR/MM2023/5_Result/inferCNV/HSC/HSC_gene_order_file.xls") %>% as.data.frame()
-colnames(geneFile) <- c("gene","chr","start","end")
-
-gene_all = Reduce(intersect,list(rownames(HSC),rownames(BC),rownames(plasma),geneFile$gene))
-geneFile <- geneFile[geneFile$gene %in% gene_all,]
-
-#chr1q_gene = geneFile[geneFile$chr == 'chr1' & geneFile$start > 123400000,'gene']
-chr1q_gene = geneFile[geneFile$chr == 'chr1' & geneFile$start > 143200000 & geneFile$end < 155100000
-,'gene'] # 1q21
-chr17p_gene = geneFile[geneFile$chr == 'chr17' & geneFile$start < 25100000,'gene']
-
-```
-
-
-### HSC
-```{r}
-t <- AverageExpression(HSC,group.by = "sample",slot = "scale",assays = "RNA") 
-df<- t$RNA %>% as.data.frame()
-df$gene <- rownames(df)
-
-df_long <- melt(df,
-                id.vars="gene",
-                variable.name="sample",
-                value.name = "avg_gene")
-
-df_long$avg_gene <- as.numeric(df_long$avg_gene)
-
-```
-
-
-#### 1q
-```{r, fig.width=4, fig.height=4}
-df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
-print(unique(df_chr1q$gene) %>% length()) # 1q gene number
-
-p <- ggboxplot(df_chr1q,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.4,0.4))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,alternative='less',ref.group = 'HD')
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=T)
-
-p
-
-```
-
-#### 17p
-```{r, fig.width=4, fig.height=4}
-df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
-print(unique(df_chr17p$gene) %>% length()) # 17p gene number
-
-p <- ggboxplot(df_chr17p,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.4,0.4))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = 'HD')
-#stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,alternative='greater',ref.group = 'HD')
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=F)
-
-p
-
-```
-
-### BC
-```{r}
-t <- AverageExpression(BC,group.by = "sample",slot = "scale",assays = "RNA") 
-df <- t$RNA %>% as.data.frame()
-df$gene <- rownames(df)
-
-df_long <- melt(df,
-                id.vars="gene",
-                variable.name="sample",
-                value.name = "avg_gene")
-
-df_long$avg_gene <- as.numeric(df_long$avg_gene)
-
-```
-
-#### 1q
-```{r, fig.width=4, fig.height=4}
-df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
-print(unique(df_chr1q$gene) %>% length()) # 1q gene number
-
-p <- ggboxplot(df_chr1q,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.2,0.2))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,ref.group = "HD")
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=F)
-
-p
-
-```
-
-#### 17p
-```{r, fig.width=4, fig.height=4}
-df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
-print(unique(df_chr17p$gene) %>% length()) # 17p gene number
-
-p <- ggboxplot(df_chr17p,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.4,0.4))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = "HD")
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=F)
-
-p
-
-```
-
-### plasma
-```{r}
-t <- AverageExpression(plasma,group.by = "sample",slot = "scale",assays = "RNA") 
-df <- t$RNA %>% as.data.frame()
-df$gene <- rownames(df)
-
-df_long <- melt(df,
-                id.vars="gene",
-                variable.name="sample",
-                value.name = "avg_gene")
-
-df_long$avg_gene <- as.numeric(df_long$avg_gene)
-```
-
-#### 1q
-```{r, fig.width=4, fig.height=4}
-df_chr1q = df_long[df_long$gene %in% chr1q_gene,]
-print(unique(df_chr1q$gene) %>% length()) # 1q gene number
-
-p <- ggboxplot(df_chr1q,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.4,0.3))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr1q), avg_gene ~ sample,paired = T,ref.group = "HD")
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=F)
-
-p
-
-```
-
-
-#### 17p
-```{r, fig.width=4, fig.height=4}
-df_chr17p = df_long[df_long$gene %in% chr17p_gene,]
-print(unique(df_chr17p$gene) %>% length()) # 17p gene number
-
-p <- ggboxplot(df_chr17p,
-          x="sample",y="avg_gene",
-          fill = 'sample',
-          outlier.shape=NA)+
-  coord_cartesian(ylim = c(-0.3,0.3))+
-  scale_fill_manual(values=col_sample)
-
-stat <- t_test(group_by(df_chr17p), avg_gene ~ sample,paired = T,ref.group = "HD")
-stat <- add_significance(stat, 'p')
-stat.test <-  add_xy_position(stat, x = 'sample',fun="median_iqr")
-
-p <- p + stat_pvalue_manual(stat.test, 
-                      label = 'p.adj',
-                      tip.length = 0.005,
-                      hide.ns=F)
-
-p
-
-```
 
 # Figure 3
 ## data
@@ -1994,5 +1829,3 @@ print("Mem2 scATAC enriched motif (Enrichment)  &  Top10 regulon activity (High 
 print(enrich_act)
 
 ```
-
-
