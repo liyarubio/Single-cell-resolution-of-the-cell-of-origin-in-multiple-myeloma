@@ -1,4 +1,4 @@
-## Code for "Single cell resolution of the cell of origin in multiple myeloma"
+## Code for manuscript "Single cell resolution of the cell of origin in multiple myeloma"
 
 <img src="https://github.com/liyarubio/Single-cell-resolution-of-the-cell-of-origin-in-multiple-myeloma/blob/main/MM%20design.png">
 
